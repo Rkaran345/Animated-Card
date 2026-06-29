@@ -147,3 +147,154 @@ export default function App() {
   const renderLoop = () => {
     // Upward flow speed of continuous transition - decreased speed by more than half for slower, premium, and calmer transitions
     progress.current += 0.0016;
+
+    // Smoothly interpolate current mouse variables towards their target positions (damping/inertia logic)
+    mouse.current.x += (mouse.current.targetX - mouse.current.x) * 0.08;
+    mouse.current.y += (mouse.current.targetY - mouse.current.y) * 0.08;
+
+    const cards = cardsRefs.current;
+    const h = window.innerHeight;
+    const { cardH } = metrics;
+
+    const continuousProgress = progress.current;
+    const roundedIndex = Math.round(continuousProgress);
+    const diffFromRound = continuousProgress - roundedIndex;  // ranges between [-0.5, 0.5]
+    
+    // Custom non-linear magnetic step logic
+    // It creates a gorgeous brief dwell/pause at front center before accelerating to the next card
+    const easedDiff = Math.sign(diffFromRound) * Math.pow(Math.abs(diffFromRound) * 2, 4.2) / 2;
+    const virtualActiveIndex = roundedIndex + easedDiff;
+
+    // Interpolate ambient background glow color dynamically
+    if (ambientGlowRef.current) {
+      const baseIndex = Math.floor(virtualActiveIndex);
+      const fraction = virtualActiveIndex - baseIndex;
+      
+      const idx1 = ((baseIndex % cardCount) + cardCount) % cardCount;
+      const idx2 = (((baseIndex + 1) % cardCount) + cardCount) % cardCount;
+      
+      const color1 = CARD_COLORS[idx1 % CARD_COLORS.length];
+      const color2 = CARD_COLORS[idx2 % CARD_COLORS.length];
+      
+      const hexToRgb = (hex) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+      };
+      
+      const c1 = hexToRgb(color1);
+      const c2 = hexToRgb(color2);
+      
+      const r = Math.round(c1.r + (c2.r - c1.r) * fraction);
+      const g = Math.round(c1.g + (c2.g - c1.g) * fraction);
+      const b = Math.round(c1.b + (c2.b - c1.b) * fraction);
+      
+      ambientGlowRef.current.style.background = `radial-gradient(circle at 50% 50%, rgba(${r}, ${g}, ${b}, 0.28) 0%, transparent 65%)`;
+    }
+
+    for (let i = 0; i < cardCount; i++) {
+      const card = cards[i];
+      if (!card) continue;
+
+      // Solve circular wrapping to get closest representation in [-cardCount/2, cardCount/2]
+      let offset = i - virtualActiveIndex;
+      const halfCount = cardCount / 2;
+      while (offset > halfCount) offset -= cardCount;
+      while (offset < -halfCount) offset += cardCount;
+
+      const absOffset = Math.abs(offset);
+      const sign = Math.sign(offset);
+
+      // Allow cards to render completely off-screen smoothly up to offset 3.0. This prevents any clipping or sudden pop-outs.
+      if (absOffset > 3.0) {
+        card.style.visibility = 'hidden';
+        continue;
+      } else {
+        card.style.visibility = 'visible';
+      }
+
+      // Spacing gap between center card and adjacent cards
+      const gap = 36;
+      const peekAmount = -55;  // Push the card's edge 55px past the screen boundary to hide a premium portion of it!
+      const D = 1350;  // Perspective distance
+
+      let y = 0;
+      let z = 0;
+      let rot = 0;
+
+      if (absOffset <= 1) {
+        // Smoothstep interpolation from 0 to 1 (Center card to first adjacent card)
+        const t = absOffset;
+        const easedT = t * t * (3 - 2 * t);
+
+        // Y moves from 0 to (cardH + gap)
+        const targetY = cardH + gap;
+        y = -sign * (easedT * targetY);
+
+        // Z moves from 400 (center) to 220 (adjacent)
+        z = 400 + easedT * (220 - 400);
+
+        // Rotation moves from 0 to 132 degrees (beautiful tilted back face)
+        rot = easedT * 132;
+      } else if (absOffset <= 2) {
+        // Smoothstep interpolation from 1 to 2 (Adjacent card to peeking screen-edge card)
+        const t = absOffset - 1;
+        const easedT = t * t * (3 - 2 * t);
+
+        const yStart = cardH + gap;
+        const zStart = 220;
+        const rotStart = 132;
+
+        const zEnd = -60;
+        const rotEnd = 175;
+
+        // Perspective-aware formula for exact edge alignment at the screen boundary (peekAmount = 26px inside)
+        const sEnd = D / (D - zEnd);
+        const yEnd = (h / 2 - peekAmount) * sEnd - (cardH / 2);
+
+        const currentY = yStart + easedT * (yEnd - yStart);
+        y = -sign * currentY;
+
+        z = zStart + easedT * (zEnd - zStart);
+        rot = rotStart + easedT * (rotEnd - rotStart);
+      } else {
+        // Smoothstep interpolation from 2 to 3 (Peeking card to completely off-screen card)
+        const t = Math.min(absOffset - 2, 1);
+        const easedT = t * t * (3 - 2 * t);
+
+        const zStart = -60;
+        const rotStart = 175;
+
+        const zEnd3 = -250;
+        const rotEnd3 = 195;
+
+        const sEnd2 = D / (D - zStart);
+        const yEnd2 = (h / 2 - peekAmount) * sEnd2 - (cardH / 2);
+
+        // Calculate yEnd3 dynamically so that the card's edge is completely 100px past the screen boundary
+        const sEnd3 = D / (D - zEnd3);
+        const yEnd3 = (h / 2 + 100) * sEnd3 + (cardH / 2);
+
+        const currentY = yEnd2 + easedT * (yEnd3 - yEnd2);
+        y = -sign * currentY;
+
+        z = zStart + easedT * (zEnd3 - zStart);
+        rot = rotStart + easedT * (rotEnd3 - rotStart);
+      }
+
+      const localCardRotation = -sign * rot;
+
+      // Determine how close this card is to the exact center (1.0 = center, 0.0 = adjacent/offscreen)
+      const centerFactor = Math.max(0, 1 - absOffset);
+
+      // Vertical tilt (around X-axis) and horizontal tilt (around Y-axis) driven by mouse coordinates
+      const maxTiltY = 15;  // Max angle tilt left-to-right (degrees)
+      const maxTiltX = 12;  // Max angle tilt up-and-down (degrees)
+
+      const activeTiltX = -mouse.current.y * maxTiltX * centerFactor;
+      const activeTiltY = mouse.current.x * maxTiltY * centerFactor;
+
+      const totalRotX = localCardRotation + activeTiltX;
