@@ -298,3 +298,142 @@ export default function App() {
       const activeTiltY = mouse.current.x * maxTiltY * centerFactor;
 
       const totalRotX = localCardRotation + activeTiltX;
+
+
+      // Dynamic holographic shimmer overlay handling
+      const shimmer = card.querySelector('.shimmer-layer') as HTMLDivElement;
+      if (shimmer) {
+        const themeColor = CARD_COLORS[i % CARD_COLORS.length];
+        const shineAngle = 135 + (mouse.current.x * 20) + (y * 0.05);
+        shimmer.style.background = `linear-gradient(${shineAngle}deg, transparent 15%, rgba(255,255,255,0.4) 42%, ${themeColor}bb 50%, rgba(255,255,255,0.4) 58%, transparent 85%)`;
+        shimmer.style.backgroundPosition = `${((mouse.current.x + 1) * 50).toFixed(1)}% ${((mouse.current.y + 1) * 50).toFixed(1)}%`;
+        shimmer.style.opacity = (0.2 + centerFactor * 0.55).toString();
+      }
+
+      // Depth z-index layer
+      card.style.zIndex = Math.round(z).toString();
+      card.style.opacity = '1';
+
+      // Inject translation matrix with the premium -3deg tilt combined with dynamic mouse-interactive 3D tilt
+      card.style.transform = `translateY(${y.toFixed(2)}px) translateZ(${z.toFixed(2)}px) rotateX(${totalRotX.toFixed(2)}deg) rotateY(${totalRotY.toFixed(2)}deg) rotateZ(-3deg)`;
+    }
+  };
+
+  useEffect(() => {
+    const tick = () => {
+      renderLoop();
+      frameId.current = requestAnimationFrame(tick);
+    };
+
+    frameId.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId.current);
+  }, [metrics]);
+
+  // Slices for 3D volumetric depth with 30% reduced thickness
+  // Span from -1.47px to 1.47px creates an extremely premium real 3D volume feel
+  const thicknessLayers = [-1.47, -0.73, 0, 0.73, 1.47];
+
+  return (
+    <div className="absolute inset-0 bg-[#000000] text-white flex items-center justify-center overflow-hidden select-none">
+      
+      {/* Dynamic ambient color glow that shifts based on circular carousel position */}
+      <div 
+        ref={ambientGlowRef} 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          background: 'radial-gradient(circle at 50% 50%, rgba(0, 122, 255, 0.2) 0%, transparent 65%)'
+        }}
+      />
+
+      {/* 3D perspective camera space */}
+      <div
+        className="relative w-full h-full flex items-center justify-center pointer-events-none z-10"
+        style={{
+          perspective: '1350px',
+        }}
+      >
+      
+        {/* Dynamic 3D coordinate viewport */}
+        <div
+          className="absolute"
+          style={{
+            width: `${metrics.cardW}px`,
+            height: `${metrics.cardH}px`,
+            transformStyle: 'preserve-3d',
+          }}
+        >
+        
+          {Array.from({ length: cardCount }).map((_, i) => (
+            <div
+              key={i}
+              ref={(el) => { cardsRefs.current[i] = el; }}
+              className="absolute inset-0"
+              style={{
+                width: `${metrics.cardW}px`,
+                height: `${metrics.cardH}px`,
+                transformStyle: 'preserve-3d',
+                backfaceVisibility: 'visible',
+              }}
+            >
+            
+              {/* Build physical 3D volumetric thickness by dense parallel layering */}
+              {thicknessLayers.map((zOffset, layerIdx) => {
+                const isFrontFace = layerIdx === thicknessLayers.length - 1;
+                const isBackFace = layerIdx === 0;
+
+                const videoSrc = CARD_VIDEOS[i % CARD_VIDEOS.length];
+                const themeColor = CARD_COLORS[i % CARD_COLORS.length];
+                const baseBgColor = '#0b0b0b';
+
+                // Middle structural slice (vibrantly tinted matching the card theme color)
+                if (!isFrontFace && !isBackFace) {
+                  return (
+                    <div
+                      key={layerIdx}
+                      className="absolute inset-0 rounded-[16px] border border-white/10 pointer-events-none overflow-hidden"
+                      style={{
+                        backgroundColor: themeColor,
+                        opacity: 0.2 + (layerIdx * 0.15),
+                        transform: `translateZ(${zOffset}px)`,
+                        boxShadow: `0 0 12px ${themeColor}40`,
+                      }}
+                    />
+                  );
+                }
+
+                // Front face slice
+                if (isFrontFace) {
+                  const frontBorderStyle = "border border-white/20";
+                  return (
+                    <div
+                      key={layerIdx}
+                      className={`absolute inset-0 rounded-[16px] ${frontBorderStyle} pointer-events-none overflow-hidden`}
+                      style={{
+                        backgroundColor: baseBgColor,
+                        transform: `translateZ(${zOffset}px)`,
+                        backfaceVisibility: 'hidden',
+                        boxShadow: `0 15px 35px rgba(0,0,0,0.6), 0 0 25px ${themeColor}40, inset 0 1px 1px rgba(255,255,255,0.25)`,
+                      }}
+                    >
+                      <video
+                        src={videoSrc}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-cover rounded-[16px]"
+                      />
+
+                      {/* Foil/Holographic Dynamic Shimmer Layer */}
+                      <div 
+                        className="shimmer-layer absolute inset-0 pointer-events-none rounded-[16px] mix-blend-color-dodge opacity-30 transition-opacity duration-300 z-10"
+                        style={{
+                          background: `linear-gradient(135deg, transparent 15%, rgba(255,255,255,0.3) 40%, ${themeColor}aa 50%, rgba(255,255,255,0.3) 60%, transparent 85%)`,
+                          backgroundSize: '200% 200%',
+                          backgroundPosition: '50% 50%',
+                        }}
+                      />
+
+                      <div className="absolute inset-0 p-5 sm:p-6 text-white h-full w-full font-sans z-20 bg-black/10">
+                        {/* GoldenSilver Metallic Contact Chip - positioned mid-left (vertically centered on the card) with custom user vectors */}
+                        <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2">
