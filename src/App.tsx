@@ -491,3 +491,91 @@ export default function App() {
                             />
                           </svg>
                         </div>
+                        {/* Double intersecting circle Brand Logo - bottom right corner */}
+                        <div className="absolute right-5 sm:right-6 bottom-5 sm:bottom-6 flex -space-x-3 items-center opacity-90">
+                          <div 
+                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full backdrop-blur-[1px] border border-white/20"
+                            style={{
+                              background: `radial-gradient(circle at 35% 35%, ${themeColor}aa, ${themeColor}33)`,
+                              boxShadow: `0 0 10px ${themeColor}55`,
+                            }}
+                          />
+                          <div 
+                            className="w-5 h-5 sm:w-6 sm:h-6 rounded-full backdrop-blur-[1px] border border-white/20"
+                            style={{
+                              background: 'radial-gradient(circle at 35% 35%, #ffffffaa, #ffffff22)',
+                              boxShadow: '0 0 10px rgba(255,255,255,0.3)',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Back face slice */}
+                    {isBackFace && (
+                      <div
+                        className="absolute inset-0 rounded-[16px] border border-white/20 pointer-events-none overflow-hidden"
+                        style={{
+                          backgroundColor: baseBgColor,
+                          transform: 'rotateX(180deg)',
+                          backfaceVisibility: 'hidden',
+                          boxShadow: `0 15px 35px rgba(0,0,0,0.6), 0 0 25px ${themeColor}40, inset 0 1px 1px rgba(255,255,255,0.25)`,
+                        }}
+                      >
+                        {/* Render Video with premium 16px blur on the back face of the card */}
+                        <div className="absolute inset-0 pointer-events-none" style={{ filter: 'blur(16px)', transform: 'scale(1.15)' }}>
+                          <video
+                            src={videoSrc}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Dynamic Color Tint overlay to tie reverse side to front side color */}
+                        <div 
+                          className="absolute inset-0 opacity-40 mix-blend-color pointer-events-none"
+                          style={{ backgroundColor: themeColor }}
+                        />
+                        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+
+                        {/* Premium Real Magnetic stripe */}
+                        <div className="absolute left-0 right-0 top-4 sm:top-5 h-7 sm:h-9 bg-black/85 backdrop-blur-md z-10">
+                          <div 
+                            className="absolute bottom-0 left-0 right-0 h-[2px] opacity-80"
+                            style={{ backgroundColor: themeColor }}
+                          />
+                        </div>
+
+                        {/* Card holder info and details on the bottom-left */}
+                        <div 
+                          className="absolute left-4 sm:left-6 bottom-4 sm:bottom-5 z-20 flex flex-col gap-0.5 sm:gap-1 text-left"
+                          style={{ fontFamily: 'JetBrains Mono, monospace' }}
+                        >
+                          {/* Card Number */}
+                          <div className="font-mono text-[10px] sm:text-[12px] font-medium tracking-[0.14em] text-white select-none">
+                            {CARD_DETAILS[i % CARD_DETAILS.length].number}
+                          </div>
+                          {/* Owner & CVV */}
+                          <div className="font-mono text-[7px] sm:text-[9px] font-medium text-white/70 tracking-wide flex items-center gap-2 select-none">
+                            <span className="uppercase">{CARD_DETAILS[i % CARD_DETAILS.length].name}</span>
+                            <span className="text-white/40 font-light">•</span>
+                            <span className="flex items-center gap-1">
+                              CVV <span style={{ color: themeColor }} className="font-bold">{CARD_DETAILS[i % CARD_DETAILS.length].cvv}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
